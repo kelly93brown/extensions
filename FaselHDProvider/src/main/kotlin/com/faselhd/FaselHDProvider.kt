@@ -1,3 +1,4 @@
+// المسار: FaselHDProvider/src/main/kotlin/com/faselhd/FaselHDProvider.kt
 
 package com.faselhd
 
@@ -6,18 +7,16 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.getQualityFromString
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.nicehttp.CloudflareKiller // ✨ تم تصحيح هذا السطر
 
 class FaselHD : MainAPI() {
     override var lang = "ar"
-    // تم التغيير إلى النطاق الصحيح الذي تستهدفه
     override var mainUrl = "https://www.faselhds.life"
     override var name = "FaselHD"
     override val usesWebView = false
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie, TvType.AsianDrama, TvType.Anime)
     
-    // CloudflareKiller ضروري للمواقع المحمية بـ Cloudflare
     private val cfKiller = CloudflareKiller()
 
     private fun String.getIntFromText(): Int? {
@@ -25,7 +24,6 @@ class FaselHD : MainAPI() {
     }
 
     private fun Element.toSearchResponse(): SearchResponse? {
-        // تم تبسيط الرابط ليكون نسبياً
         val url = selectFirst("div.postDiv a")?.attr("href") ?: return null
         val posterUrl = selectFirst("div.postDiv a div img")?.attr("data-src")?.ifEmpty {
             selectFirst("div.postDiv a div img")?.attr("src")
@@ -33,7 +31,6 @@ class FaselHD : MainAPI() {
         val title = selectFirst("div.postDiv a div img")?.attr("alt") ?: ""
         val quality = selectFirst(".quality")?.text()?.replace("1080p |-".toRegex(), "")
         
-        // تحسين منطق تحديد النوع
         val type = when {
             title.contains("فيلم") -> TvType.Movie
             title.contains("انمي") || title.contains("أنمي") -> TvType.Anime
@@ -49,12 +46,10 @@ class FaselHD : MainAPI() {
             null,
             null,
             quality = getQualityFromString(quality),
-            // تمرير الـ Headers مطلوب للحصول على الصور إذا كان الموقع محمياً
             posterHeaders = cfKiller.getCookieHeaders(mainUrl).toMap()
         )
     }
 
-    // تم تحديث الروابط لتعكس الموقع الصحيح
     override val mainPage = mainPageOf(
         "$mainUrl/all-movies/page/" to "جميع الافلام",
         "$mainUrl/movies_top_views/page/" to "الافلام الاعلى مشاهدة",
@@ -67,7 +62,6 @@ class FaselHD : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data + page
-        // استخدام cfKiller مباشرة لأنه مطلوب دائمًا
         val doc = app.get(url, interceptor = cfKiller, timeout = 120).document
         val list = doc.select("div#postList div.col-xl-2.col-lg-2.col-md-3.col-sm-3")
             .mapNotNull { it.toSearchResponse() }
@@ -114,7 +108,6 @@ class FaselHD : MainAPI() {
             }
         } else {
             val episodes = mutableListOf<Episode>()
-            // الحصول على حلقات الموسم الحالي
             doc.select("div.epAll a").mapNotNull {
                 episodes.add(
                     Episode(
@@ -126,7 +119,6 @@ class FaselHD : MainAPI() {
                 )
             }
             
-            // الحصول على حلقات بقية المواسم
             doc.select("div#seasonList div.seasonDiv:not(.active)").apmap { seasonElement ->
                 val seasonId = seasonElement.attr("onclick").replace(".*\\/\\?p=|'".toRegex(), "")
                 val seasonDoc = app.get("$mainUrl/?p=$seasonId", interceptor = cfKiller).document
@@ -154,7 +146,6 @@ class FaselHD : MainAPI() {
         }
     }
 
-    // هذه الدالة هي الأصعب وقد تحتاج إلى تعديل إذا غيّر الموقع مشغلاته
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -163,19 +154,9 @@ class FaselHD : MainAPI() {
     ): Boolean {
         val doc = app.get(data, interceptor = cfKiller).document
         
-        // البحث عن iframe الخاص بالمشغل
         val iframeSrc = doc.selectFirst("iframe[name=player_iframe]")?.attr("src")
         if (iframeSrc != null) {
-            // العديد من المشغلات تحتاج إلى WebView لحل الروابط المشفرة بـ JavaScript
-            // هذه الطريقة قديمة وقد لا تعمل
-            // val webView = WebViewResolver(Regex("""master\.m3u8""")).resolveUsingWebView(
-            //     requestCreator("GET", iframeSrc, referer = mainUrl)
-            // ).first
-            // M3u8Helper.generateM3u8(this.name, webView.url.toString(), referer = mainUrl).forEach(callback)
-
-            // طريقة بديلة وأبسط لجلب محتوى الـ iframe
             val iframeDoc = app.get(iframeSrc, interceptor = cfKiller, referer = data).document
-            // البحث عن روابط m3u8 مباشرة في الصفحة
             val m3u8Link = Regex("""(https?://[^\s"'<>]+\.m3u8)""").find(iframeDoc.html())?.value
             
             if (m3u8Link != null) {

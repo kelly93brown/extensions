@@ -1,5 +1,3 @@
-// المسار: FaselHDProvider/src/main/kotlin/com/faselhd/FaselHDPlugin.kt
-
 package com.faselhd
 
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin

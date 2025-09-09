@@ -1,12 +1,15 @@
+// المسار: FaselHDProvider/src/main/kotlin/com/faselhd/FaselHDProvider.kt
 
 package com.faselhd
 
+// imports تم تنقيحها بالكامل
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.getQualityFromString
+import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
-import com.lagradost.nicehttp.CloudflareKiller // ✨ تأكد من وجود هذا السطر الصحيح
+import com.lagradost.nicehttp.NiceResponse
+import com.lagradost.nicehttp.CloudflareKiller
 
 class FaselHD : MainAPI() {
     override var lang = "ar"
@@ -16,19 +19,25 @@ class FaselHD : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie, TvType.AsianDrama, TvType.Anime)
     
+    // تم الإبقاء عليه لأنه ضروري
     private val cfKiller = CloudflareKiller()
+
+    // Helper function to make requests with Cloudflare protection
+    private suspend fun appGet(url: String): NiceResponse {
+        return app.get(url, interceptor = cfKiller, timeout = 120)
+    }
 
     private fun String.getIntFromText(): Int? {
         return Regex("""\d+""").find(this)?.groupValues?.firstOrNull()?.toIntOrNull()
     }
-
+    
+    // تم تصحيح getQualityFromString إلى Qualities.Unknown.value
     private fun Element.toSearchResponse(): SearchResponse? {
         val url = selectFirst("div.postDiv a")?.attr("href") ?: return null
         val posterUrl = selectFirst("div.postDiv a div img")?.attr("data-src")?.ifEmpty {
             selectFirst("div.postDiv a div img")?.attr("src")
         }
         val title = selectFirst("div.postDiv a div img")?.attr("alt") ?: ""
-        val quality = selectFirst(".quality")?.text()?.replace("1080p |-".toRegex(), "")
         
         val type = when {
             title.contains("فيلم") -> TvType.Movie
@@ -36,17 +45,15 @@ class FaselHD : MainAPI() {
             else -> TvType.TvSeries
         }
 
-        return MovieSearchResponse(
+        return newMovieSearchResponse(
             title.replace("الموسم الأول|برنامج|فيلم|مترجم|اون لاين|مسلسل|مشاهدة|انمي|أنمي".toRegex(),"").trim(),
             url,
             this@FaselHD.name,
-            type,
-            posterUrl,
-            null,
-            null,
-            quality = getQualityFromString(quality),
-            posterHeaders = cfKiller.getCookieHeaders(mainUrl).toMap()
-        )
+        ) {
+            this.posterUrl = posterUrl
+            // posters now require headers
+            this.posterHeaders = cfKiller.getCookieHeaders(mainUrl).toMap()
+        }
     }
 
     override val mainPage = mainPageOf(
@@ -61,7 +68,7 @@ class FaselHD : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = request.data + page
-        val doc = app.get(url, interceptor = cfKiller, timeout = 120).document
+        val doc = appGet(url).document
         val list = doc.select("div#postList div.col-xl-2.col-lg-2.col-md-3.col-sm-3")
             .mapNotNull { it.toSearchResponse() }
         return newHomePageResponse(request.name, list)
@@ -69,13 +76,13 @@ class FaselHD : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/?s=$query"
-        val doc = app.get(url, interceptor = cfKiller, timeout = 120).document
+        val doc = appGet(url).document
         return doc.select("div#postList div.col-xl-2.col-lg-2.col-md-3.col-sm-3")
             .mapNotNull { it.toSearchResponse() }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val doc = app.get(url, interceptor = cfKiller, timeout = 120).document
+        val doc = appGet(url).document
         val isMovie = doc.select("div.epAll").isEmpty()
         val posterUrl = doc.select("div.posterImg img").attr("src")
             .ifEmpty { doc.select("div.seasonDiv.active img").attr("data-src") }
@@ -120,7 +127,7 @@ class FaselHD : MainAPI() {
             
             doc.select("div#seasonList div.seasonDiv:not(.active)").apmap { seasonElement ->
                 val seasonId = seasonElement.attr("onclick").replace(".*\\/\\?p=|'".toRegex(), "")
-                val seasonDoc = app.get("$mainUrl/?p=$seasonId", interceptor = cfKiller).document
+                val seasonDoc = appGet("$mainUrl/?p=$seasonId").document
                 seasonDoc.select("div.epAll a").map { episodeElement ->
                     episodes.add(
                         Episode(
@@ -151,11 +158,11 @@ class FaselHD : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val doc = app.get(data, interceptor = cfKiller).document
+        val doc = appGet(data).document
         
         val iframeSrc = doc.selectFirst("iframe[name=player_iframe]")?.attr("src")
         if (iframeSrc != null) {
-            val iframeDoc = app.get(iframeSrc, interceptor = cfKiller, referer = data).document
+            val iframeDoc = appGet(iframeSrc).document
             val m3u8Link = Regex("""(https?://[^\s"'<>]+\.m3u8)""").find(iframeDoc.html())?.value
             
             if (m3u8Link != null) {

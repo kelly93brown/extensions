@@ -2,11 +2,10 @@
 
 package com.faselhd
 
-// imports تم تنقيحها بالكامل
+// imports تم التأكيد عليها
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 import com.lagradost.nicehttp.NiceResponse
 import com.lagradost.nicehttp.CloudflareKiller
@@ -19,10 +18,8 @@ class FaselHD : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie, TvType.AsianDrama, TvType.Anime)
     
-    // تم الإبقاء عليه لأنه ضروري
     private val cfKiller = CloudflareKiller()
 
-    // Helper function to make requests with Cloudflare protection
     private suspend fun appGet(url: String): NiceResponse {
         return app.get(url, interceptor = cfKiller, timeout = 120)
     }
@@ -31,7 +28,9 @@ class FaselHD : MainAPI() {
         return Regex("""\d+""").find(this)?.groupValues?.firstOrNull()?.toIntOrNull()
     }
     
-    // تم تصحيح getQualityFromString إلى Qualities.Unknown.value
+    // ===============================================================
+    // ✨✨✨ تم إجراء التصحيح الرئيسي هنا ✨✨✨
+    // ===============================================================
     private fun Element.toSearchResponse(): SearchResponse? {
         val url = selectFirst("div.postDiv a")?.attr("href") ?: return null
         val posterUrl = selectFirst("div.postDiv a div img")?.attr("data-src")?.ifEmpty {
@@ -39,21 +38,22 @@ class FaselHD : MainAPI() {
         }
         val title = selectFirst("div.postDiv a div img")?.attr("alt") ?: ""
         
+        // تحديد النوع
         val type = when {
             title.contains("فيلم") -> TvType.Movie
             title.contains("انمي") || title.contains("أنمي") -> TvType.Anime
             else -> TvType.TvSeries
         }
-
+        
+        // تم تصحيح طريقة الاستدعاء لتمرير النوع بشكل صحيح
         return newMovieSearchResponse(
-            title.replace("الموسم الأول|برنامج|فيلم|مترجم|اون لاين|مسلسل|مشاهدة|انمي|أنمي".toRegex(),"").trim(),
-            url,
-            this@FaselHD.name,
-        ) {
-            this.posterUrl = posterUrl
-            // posters now require headers
-            this.posterHeaders = cfKiller.getCookieHeaders(mainUrl).toMap()
-        }
+            name = title.replace("الموسم الأول|برنامج|فيلم|مترجم|اون لاين|مسلسل|مشاهدة|انمي|أنمي".toRegex(),"").trim(),
+            url = url,
+            apiName = this@FaselHD.name,
+            type = type, // تمرير الكائن مباشرة
+            posterUrl = posterUrl,
+            posterHeaders = cfKiller.getCookieHeaders(mainUrl).toMap()
+        )
     }
 
     override val mainPage = mainPageOf(
@@ -67,16 +67,14 @@ class FaselHD : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = request.data + page
-        val doc = appGet(url).document
+        val doc = appGet(request.data + page).document
         val list = doc.select("div#postList div.col-xl-2.col-lg-2.col-md-3.col-sm-3")
             .mapNotNull { it.toSearchResponse() }
         return newHomePageResponse(request.name, list)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/?s=$query"
-        val doc = appGet(url).document
+        val doc = appGet("$mainUrl/?s=$query").document
         return doc.select("div#postList div.col-xl-2.col-lg-2.col-md-3.col-sm-3")
             .mapNotNull { it.toSearchResponse() }
     }

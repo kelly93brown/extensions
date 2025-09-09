@@ -1,43 +1,42 @@
+// المسار: FaselHDProvider/src/main/kotlin/com/faselhd/FaselHDProvider.kt
 
 package com.faselhd
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.ExtractorLink // ✨ تم إضافة الـ import الناقص
 
-class FaselHD : MainAPI() { // MainAPI هو الكلاس الأساسي لأي إضافة
-    // المعلومات الأساسية للإضافة
+class FaselHD : MainAPI() {
     override var name = "FaselHD"
     override var mainUrl = "https://www.faselhds.life"
     override var lang = "ar"
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie, TvType.Anime)
-
-    // سنترك هذه الدوال فارغة في البداية
-    // هدفنا هو بناء ناجح أولاً
     
     override val hasMainPage = true
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        // سنضيف الكود هنا لاحقًا
         return null
     }
 
     override suspend fun search(query: String): List<SearchResponse>? {
-        // سنضيف الكود هنا لاحقًا
         return null
     }
-
-    override suspend fun load(url: String): LoadResponse? {
-        // سنضيف الكود هنا لاحقًا
-        return null
+    
+    // ===============================================================
+    // ✨✨✨ تم إجراء التصحيح الرئيسي هنا ✨✨✨
+    // ===============================================================
+    // تم تغيير نوع الإرجاع ليكون LoadResponse بدلاً من LoadResponse?
+    override suspend fun load(url: String): LoadResponse {
+        // مؤقتًا سنرمي خطأ لأن الدالة يجب أن تُرجع شيئًا
+        throw NotImplementedError()
     }
 
+    // تم تغيير نوع الإرجاع ليكون Boolean? بدلاً من Boolean
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        // سنضيف الكود هنا لاحقًا
+    ): Boolean? {
         return false
     }
 }
-

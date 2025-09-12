@@ -1,10 +1,13 @@
+
 // لا توجد أي اعتماديات خارجية على الإطلاق
 version = 12
+
 
 cloudstream {
     language = "ar"
     description = "إضافة لمشاهدة الأفلام والمسلسلات من موقع فاصل إعلاني"
     authors = listOf("adamwolker21")
+
 
     status = 1 
     tvTypes = listOf(
@@ -12,5 +15,7 @@ cloudstream {
         "TvSeries",
     )
 
+
     iconUrl = "https://i.imgur.com/example.png"
 }
+
